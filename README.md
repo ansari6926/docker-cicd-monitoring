@@ -1,9 +1,5 @@
 # docker-cicd-monitoring
 
-[![CI](https://github.com/ansari6926/docker-cicd-monitoring/actions/workflows/ci.yml/badge.svg)](https://github.com/ansari6926/docker-cicd-monitoring/actions/workflows/ci.yml)
-[![Docker Hub](https://img.shields.io/docker/pulls/ansari6926/docker-cicd-monitoring)](https://hub.docker.com/r/ansari6926/docker-cicd-monitoring)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-
 A production-style **Flask API** fully instrumented with **Prometheus** metrics, orchestrated with **Docker Compose**, visualized in **Grafana**, and shipped via a **GitHub Actions** CI/CD pipeline.
 
 ---
