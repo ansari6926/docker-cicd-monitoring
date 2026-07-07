@@ -27,17 +27,7 @@ A production-style **Flask API** fully instrumented with **Prometheus** metrics,
 │                               └──────────────────────┘  │
 └─────────────────────────────────────────────────────────┘
 ```
-
----
-
 ## 🚀 Quick Start
-
-### Prerequisites
-
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) ≥ 24.x
-- [Docker Compose](https://docs.docker.com/compose/) (bundled with Docker Desktop)
-- [Git](https://git-scm.com/)
-
 ### 1. Clone the repository
 
 ```bash
@@ -66,16 +56,6 @@ All three services should show `healthy` or `running`.
 
 ---
 
-## 🌐 Service URLs
-
-| Service    | URL                              | Credentials      |
-|------------|----------------------------------|------------------|
-| Flask API  | http://localhost:5000            | —                |
-| Prometheus | http://localhost:9090            | —                |
-| Grafana    | http://localhost:3000            | admin / admin    |
-
----
-
 ## 🔌 API Endpoints
 
 | Method | Endpoint   | Description                                      |
@@ -84,22 +64,6 @@ All three services should show `healthy` or `running`.
 | GET    | `/items`   | Returns a list of 3 widgets (simulated latency)  |
 | GET    | `/chaos`   | Returns 500 ~20% of the time (chaos simulation)  |
 | GET    | `/metrics` | Prometheus scrape endpoint                       |
-
-### Example requests
-
-```bash
-# Health check
-curl http://localhost:5000/health
-
-# List items
-curl http://localhost:5000/items
-
-# Chaos endpoint (may return 500)
-curl http://localhost:5000/chaos
-
-# Prometheus metrics
-curl http://localhost:5000/metrics
-```
 
 ---
 
@@ -116,8 +80,6 @@ The dashboard **"Flask API — CI/CD Monitoring"** is auto-provisioned and inclu
 | Req/s by Endpoint (timeseries) | `sum(rate(http_requests_total[1m])) by (endpoint)`                                                   |
 | Latency P50/P95/P99            | `histogram_quantile(0.9x, ...)`                                                                      |
 | Errors by Endpoint             | `sum(rate(http_errors_total[1m])) by (endpoint, status_code)`                                        |
-
-Open [http://localhost:3000](http://localhost:3000) → login with `admin` / `admin` → the dashboard loads automatically.
 
 ---
 
@@ -140,15 +102,6 @@ File: [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
 1. **`/health`** — must return HTTP 200
 2. **`/items`** — must return HTTP 200
 3. **`/metrics`** — response body must contain `http_requests_total`
-
-### Required GitHub Secrets
-
-Go to **Repository → Settings → Secrets and variables → Actions** and add:
-
-| Secret               | Value                                |
-|----------------------|--------------------------------------|
-| `DOCKERHUB_USERNAME` | Your Docker Hub username             |
-| `DOCKERHUB_TOKEN`    | A Docker Hub access token (not password) |
 
 ---
 
