@@ -1,0 +1,133 @@
+name: CI — Build, Test, Push
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main]
+
+env:
+  IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/docker-cicd-monitoring
+
+jobs:
+  # ── Build & Smoke Test ──────────────────────────────────────────────────────
+  build-and-test:
+    name: Build Image & Smoke Test
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tags }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Extract metadata (tags, labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,prefix=sha-
+            type=ref,event=branch
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      # Build the image locally (no push yet) for the smoke test
+      - name: Build Docker image (local)
+        uses: docker/build-push-action@v5
+        with:
+          context: ./app
+          file: ./app/Dockerfile
+          push: false
+          load: true
+          tags: cicd-api:smoke
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # ── Smoke Test ────────────────────────────────────────────────────────────
+      - name: Start container for smoke test
+        run: |
+          docker run -d \
+            --name smoke_api \
+            -p 5000:5000 \
+            cicd-api:smoke
+          echo "Waiting for API to become ready..."
+          for i in $(seq 1 20); do
+            if curl -sf http://localhost:5000/health; then
+              echo "✅ API is up!"
+              break
+            fi
+            echo "  attempt $i — sleeping 2s..."
+            sleep 2
+          done
+
+      - name: Smoke test — /health
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/health)
+          echo "Health status: $STATUS"
+          [ "$STATUS" = "200" ] || (echo "❌ /health returned $STATUS" && exit 1)
+
+      - name: Smoke test — /items
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/items)
+          echo "Items status: $STATUS"
+          [ "$STATUS" = "200" ] || (echo "❌ /items returned $STATUS" && exit 1)
+
+      - name: Smoke test — /metrics (Prometheus endpoint)
+        run: |
+          BODY=$(curl -s http://localhost:5000/metrics)
+          echo "$BODY" | grep -q "http_requests_total" \
+            || (echo "❌ /metrics missing http_requests_total" && exit 1)
+          echo "✅ /metrics contains expected metric names"
+
+      - name: Stop smoke test container
+        if: always()
+        run: docker rm -f smoke_api || true
+
+  # ── Push to Docker Hub ──────────────────────────────────────────────────────
+  push:
+    name: Push to Docker Hub
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    # Only push on pushes to main (not PRs)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,prefix=sha-
+            type=ref,event=branch
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./app
+          file: ./app/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+
+      - name: Image digest
+        run: echo "Pushed image with digest ${{ steps.docker_build.outputs.digest }}"
